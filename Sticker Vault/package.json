@@ -1,0 +1,93 @@
+{
+  "$schema": "https://www.raycast.com/schemas/extension.json",
+  "name": "sticker-vault",
+  "title": "Sticker Vault",
+  "description": "Collect, organize, and instantly use stickers from anywhere — web, WhatsApp, clipboard, and files.",
+  "icon": "icon.png",
+  "author": "xlr-01",
+  "categories": [
+    "Media",
+    "Productivity"
+  ],
+  "license": "MIT",
+  "version": "1.0.0",
+  "commands": [
+    {
+      "name": "browse-stickers",
+      "title": "Browse Stickers",
+      "description": "Browse, search, and use your sticker collection",
+      "mode": "view",
+      "icon": "icon.png"
+    },
+    {
+      "name": "add-sticker",
+      "title": "Add Sticker",
+      "description": "Import a sticker from clipboard, URL, or file",
+      "mode": "view",
+      "icon": "icon.png"
+    }
+  ],
+  "preferences": [
+    {
+      "name": "gridSize",
+      "type": "dropdown",
+      "required": false,
+      "title": "Grid Size",
+      "description": "How large to display sticker thumbnails",
+      "default": "medium",
+      "data": [
+        {
+          "title": "Small",
+          "value": "small"
+        },
+        {
+          "title": "Medium",
+          "value": "medium"
+        },
+        {
+          "title": "Large",
+          "value": "large"
+        }
+      ]
+    },
+    {
+      "name": "useOllama",
+      "type": "checkbox",
+      "required": false,
+      "title": "Local AI Tagging",
+      "label": "Use Ollama for Auto-Tagging",
+      "description": "Uses your local Ollama instance to analyze and tag stickers instead of Raycast AI.",
+      "default": false
+    },
+    {
+      "name": "ollamaModel",
+      "type": "textfield",
+      "required": false,
+      "title": "Ollama Model",
+      "description": "The vision model to use in Ollama (e.g. llava, llava:34b, llama3.2-vision)",
+      "default": "gemma4:31b-cloud"
+    }
+  ],
+  "dependencies": {
+    "@raycast/api": "^1.93.3",
+    "@raycast/utils": "^1.19.1",
+    "fuse.js": "^7.5.0",
+    "node-fetch": "^3.3.2"
+  },
+  "devDependencies": {
+    "@raycast/eslint-config": "^1.0.11",
+    "@types/node": "22.15.17",
+    "@types/react": "19.1.2",
+    "eslint": "^8.57.0",
+    "prettier": "^3.5.3",
+    "react": "^19.1.0",
+    "typescript": "^5.8.3"
+  },
+  "scripts": {
+    "build": "ray build --skip-types -e dist -o dist",
+    "dev": "ray develop",
+    "fix-lint": "ray lint --fix",
+    "lint": "ray lint",
+    "publish": "npx @raycast/api@latest publish"
+  }
+}
