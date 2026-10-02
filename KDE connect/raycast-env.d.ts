@@ -17,6 +17,8 @@ declare namespace Preferences {
   export type Send = ExtensionPreferences & {}
   /** Preferences accessible in the `open` command */
   export type Open = ExtensionPreferences & {}
+  /** Preferences accessible in the `toggle-prevent-sleep` command */
+  export type TogglePreventSleep = ExtensionPreferences & {}
 }
 
 declare namespace Arguments {
@@ -27,5 +29,7 @@ declare namespace Arguments {
 }
   /** Arguments passed to the `open` command */
   export type Open = {}
+  /** Arguments passed to the `toggle-prevent-sleep` command */
+  export type TogglePreventSleep = {}
 }
 

@@ -87,36 +87,28 @@ export async function analyzeStickerWithAI(
         .filter((w) => w.length > 1)
     : [];
 
-  // 1. Try local Ollama if configured
-  const ollamaResult = await analyzeWithOllama(imagePath);
+  // 1. Try local Ollama (prioritized as requested)
+  const ollamaResult = await analyzeWithOllama(visionData);
   if (ollamaResult) {
-    // Merge OCR text into Ollama's result
-    if (visionData.text) {
-      ollamaResult.tags.push(
-        ...ocrWords.filter((w) => !ollamaResult.tags.includes(w)),
-      );
-    }
     return ollamaResult;
   }
 
-  // 2. Prompt Raycast AI
+  // 2. Prompt Raycast AI (Fallback)
   const prompt = `
-You are a highly capable assistant that auto-tags meme and reaction stickers for search.
+You are a highly creative and humorous assistant that auto-tags meme and reaction stickers for search.
 I ran an Apple Vision model on a sticker image.
 
 Here are the visual concepts detected: [${visionData.tags.join(", ")}]
 Here is the text extracted via OCR: "${visionData.text}"
 
 Based on this information, generate:
-1. A short, catchy name for the sticker (max 3 words). If there's prominent text, use it as the name. Otherwise, describe the vibe/subject.
-2. 15 to 20 search tags. Be EXHAUSTIVE. Cover ALL of these dimensions:
-   - What objects/animals/people are in the image (e.g. cat, dog, person, hat, glasses, sunglasses)
-   - Emotions and expressions (e.g. angry, happy, sad, cool, shocked, confused, smug)
-   - Actions (e.g. laughing, crying, dancing, sleeping, staring, pointing, holding)
-   - Style (e.g. cartoon, anime, pixel, realistic, meme, sticker, drawing)
-   - Colors (e.g. red, blue, yellow, colorful, dark)
-   - Context and vibe (e.g. reaction, funny, sarcastic, wholesome, savage, relatable)
-   - Accessories or props (e.g. glasses, sunglasses, hat, crown, coffee, phone)
+1. A short, catchy, and funny name for the sticker (max 3-5 words). You can creatively use Hinglish (Hindi + English) or English for the name to make it relatable and easy to find (e.g., "bhai kya kar raha hai", "samajh nahi aaya", "bruh moment").
+2. 15 to 20 search tags. Think outside the box! Provide multiple varieties of creative and funny tags. Cover ALL of these dimensions:
+   - Literal objects/people (e.g. cat, dog, person, hat, glasses)
+   - Funny interpretations and emotions (e.g. ded, crying inside, savage, confused unga bunga)
+   - Actions and vibe (e.g. judging you, laughing out loud, weird flex)
+   - Hinglish/Desi slang context if applicable (e.g. desi, jugaad, mast, bakwas)
+   - Context and use-case (e.g. reaction, sarcasm, wholesome, roasted)
 3. 5 to 8 relevant emojis (as strings).
 
 Return EXACTLY a valid JSON object with this schema:
@@ -170,46 +162,45 @@ Do not return any markdown formatting, only the JSON.`;
   }
 }
 
-async function analyzeWithOllama(
-  imagePath: string,
-): Promise<AIStickerMetadata | null> {
+async function analyzeWithOllama(visionData: {
+  tags: string[];
+  text: string;
+}): Promise<AIStickerMetadata | null> {
   const prefs = getPreferenceValues<{
     useOllama?: boolean;
     ollamaModel?: string;
   }>();
-  if (!prefs.useOllama || !prefs.ollamaModel) return null;
+
+  // We try Ollama if useOllama is true, or if they have a model set to the requested one
+  const model = prefs.ollamaModel || "gemma4:31b-cloud";
 
   try {
-    const base64Image = await fs.promises.readFile(imagePath, {
-      encoding: "base64",
-    });
+    const systemPrompt = `You are a highly creative and humorous data-extraction assistant. Your sole purpose is to output valid JSON. 
+You will receive visual concepts and OCR text from an image. You must interpret the context of the image deeply. Think about the vibe, emotions (e.g., funny, savage, weird), and any underlying meme/reaction context based on the data provided.
 
-    const prompt = `You are a highly capable assistant that auto-tags meme and reaction stickers for search.
-Analyze this image and generate:
-1. A short, catchy name for the sticker (max 3 words). If there's prominent text, use it as the name. Otherwise, describe the vibe/subject.
-2. 15 to 20 search tags. Be EXHAUSTIVE. Cover ALL of these dimensions:
-   - What objects/animals/people are in the image (e.g. cat, dog, person, hat, glasses, sunglasses)
-   - Emotions and expressions (e.g. angry, happy, sad, cool, shocked, confused, smug)
-   - Actions (e.g. laughing, crying, dancing, sleeping, staring, pointing, holding)
-   - Style (e.g. cartoon, anime, pixel, realistic, meme, sticker, drawing)
-   - Colors (e.g. red, blue, yellow, colorful, dark)
-   - Context and vibe (e.g. reaction, funny, sarcastic, wholesome, savage, relatable)
-   - Accessories or props (e.g. glasses, sunglasses, hat, crown, coffee, phone)
-3. 5 to 8 relevant emojis (as strings).
-
-Return EXACTLY a valid JSON object with this schema:
+You must return exactly a valid JSON object with the following structure, and absolutely nothing else:
 {
-  "name": "string",
-  "tags": ["string"],
-  "keywords": ["string"]
+  "name": "A catchy, funny name using Hinglish or English (e.g., 'kya kar raha hai', 'bruh')",
+  "tags": ["tag1", "tag2", "tag3", "tag4", "tag5"],
+  "keywords": ["emoji1", "emoji2", "emoji3"]
 }
-Do not return any markdown formatting, only the JSON.`;
+
+Rules:
+- NEVER output conversational text like "Here is the JSON" or "Sure!".
+- ONLY output the raw JSON object.
+- "tags" must be an array of strings containing exactly the tags you generate. You MUST include multiple varieties of creative and funny tags, including Hinglish/Desi slang (if applicable), interpretations (e.g., 'ded', 'crying inside'), and literal objects. Be exhaustive (15-20 tags) and think outside the box!
+- "keywords" must be an array of emoji strings matching the emotion/vibe.`;
+
+    const prompt = `Visual concepts detected: [${visionData.tags.join(", ")}]
+Text extracted via OCR: "${visionData.text}"
+
+Generate the JSON object for this sticker.`;
 
     const payload = JSON.stringify({
-      model: prefs.ollamaModel,
+      model: model,
+      system: systemPrompt,
       prompt: prompt,
       stream: false,
-      images: [base64Image],
       format: "json",
     });
 
@@ -229,19 +220,35 @@ Do not return any markdown formatting, only the JSON.`;
     fs.promises.unlink(tmpPayloadPath).catch(() => {});
 
     const jsonResponse = JSON.parse(stdout) as { response: string };
-    const cleanedJson = jsonResponse.response
-      .replace(/^```json/m, "")
-      .replace(/^```/m, "")
-      .trim();
-    const result = JSON.parse(cleanedJson) as AIStickerMetadata;
 
-    if (!result.name) result.name = "Unknown Sticker";
-    if (!Array.isArray(result.tags)) result.tags = ["sticker"];
-    if (!Array.isArray(result.keywords)) result.keywords = [];
+    if (!jsonResponse || !jsonResponse.response) {
+      throw new Error("Invalid response from Ollama");
+    }
+
+    let cleanedJson = jsonResponse.response.trim();
+    const match = cleanedJson.match(/\{[\s\S]*\}/);
+    if (match) {
+      cleanedJson = match[0];
+    }
+
+    const parsed = JSON.parse(cleanedJson) as any;
+
+    const result: AIStickerMetadata = {
+      name:
+        parsed.name && typeof parsed.name === "string"
+          ? parsed.name
+          : "Unknown Sticker",
+      tags: Array.isArray(parsed.tags)
+        ? parsed.tags
+        : typeof parsed.tags === "string"
+          ? parsed.tags.split(",").map((t: string) => t.trim())
+          : ["sticker"],
+      keywords: Array.isArray(parsed.keywords) ? parsed.keywords : [],
+    };
 
     return result;
   } catch (error) {
-    console.error("Ollama vision analysis failed:", error);
+    console.error("Ollama analysis failed:", error);
     return null;
   }
 }

@@ -38,7 +38,7 @@ async function executeSql<T = unknown>(query: string): Promise<T[]> {
             "\nQuery:",
             query,
             "\nStderr:",
-            stderr
+            stderr,
           );
           reject(error);
           return;
@@ -53,7 +53,7 @@ async function executeSql<T = unknown>(query: string): Promise<T[]> {
           console.error("JSON Parse Error for output:", stdout);
           reject(parseError);
         }
-      }
+      },
     );
 
     if (child.stdin) {

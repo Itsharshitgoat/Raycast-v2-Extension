@@ -36,6 +36,14 @@
       "description": "Opens the KDE Connect application window",
       "icon": "command-icon.png",
       "mode": "no-view"
+    },
+    {
+      "name": "toggle-prevent-sleep",
+      "title": "Mac Toggle Sleep",
+      "subtitle": "KDE Connect",
+      "description": "Toggle macOS sleep prevention on or off — keeps your Mac awake with the lid closed so media keeps playing",
+      "icon": "command-icon.png",
+      "mode": "no-view"
     }
   ],
   "dependencies": {

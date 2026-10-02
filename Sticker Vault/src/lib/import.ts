@@ -5,6 +5,7 @@ import path from "path";
 import { execFile } from "child_process";
 import { promisify } from "util";
 import { fileURLToPath } from "url";
+import os from "os";
 import {
   insertSticker,
   addTagsToSticker,
@@ -34,6 +35,85 @@ export interface ImportResult {
   existingSticker?: StickerRecord;
 }
 
+async function getClipboardImage(): Promise<Buffer | null> {
+  const tmpId = crypto.randomUUID();
+  const tmpPng = path.join(
+    os.tmpdir(),
+    `raycast_sticker_clipboard_${tmpId}.png`,
+  );
+
+  // AppleScript is significantly faster and more reliable for reading image data from the clipboard
+  const asScript = `
+    try
+      set theFile to (POSIX file "${tmpPng}")
+      set imageData to the clipboard as «class PNGf»
+      set f to open for access theFile with write permission
+      set eof of f to 0
+      write imageData to f
+      close access f
+      return "SUCCESS"
+    on error
+      return "FAIL"
+    end try
+  `;
+
+  // Fallback to JXA in case AppleScript fails
+  const jxaScript = `
+    try {
+      ObjC.import('AppKit');
+      var pb = $.NSPasteboard.generalPasteboard;
+      var options = $.NSDictionary.alloc.init;
+      var classes = $.NSArray.arrayWithObject($.NSImage.class);
+      var theImages = pb.readObjectsForClassesOptions(classes, options);
+      if (theImages && theImages.count > 0) {
+        var theImage = theImages.objectAtIndex(0);
+        var tiffData = theImage.TIFFRepresentation;
+        var bitmapRep = $.NSBitmapImageRep.imageRepWithData(tiffData);
+        var pngData = bitmapRep.representationUsingTypeProperties($.NSBitmapImageFileTypePNG, $.NSDictionary.alloc.init);
+        if (pngData && pngData.writeToFileAtomically("${tmpPng}", true)) {
+          "SUCCESS";
+        } else {
+          "FAIL";
+        }
+      } else {
+        "FAIL";
+      }
+    } catch (e) {
+      "FAIL";
+    }
+  `;
+
+  try {
+    const { stdout: asStdout } = await execFileAsync("osascript", [
+      "-e",
+      asScript,
+    ]);
+    if (asStdout.trim() === "SUCCESS") {
+      return await fs.promises.readFile(tmpPng);
+    }
+  } catch (error) {
+    // Ignore AppleScript error
+  }
+
+  try {
+    const { stdout: jxaStdout } = await execFileAsync("osascript", [
+      "-l",
+      "JavaScript",
+      "-e",
+      jxaScript,
+    ]);
+    if (jxaStdout.trim() === "SUCCESS") {
+      return await fs.promises.readFile(tmpPng);
+    }
+  } catch (error) {
+    // Ignore JXA error
+  } finally {
+    await fs.promises.unlink(tmpPng).catch(() => {});
+  }
+
+  return null;
+}
+
 /**
  * Imports a sticker from the clipboard.
  * @param options Import options
@@ -43,16 +123,24 @@ export async function importFromClipboard(
   options: ImportOptions,
 ): Promise<ImportResult> {
   const content = await Clipboard.read();
-  let buffer: Buffer;
+  let buffer: Buffer | null = null;
 
   if (content.file) {
     const filePath = content.file.startsWith("file://")
       ? fileURLToPath(content.file)
       : content.file;
     buffer = await fs.promises.readFile(filePath);
-  } else if (content.text && content.text.startsWith("http")) {
+  }
+
+  if (!buffer) {
+    buffer = await getClipboardImage();
+  }
+
+  if (!buffer && content.text && content.text.startsWith("http")) {
     return importFromUrl(content.text, options);
-  } else {
+  }
+
+  if (!buffer) {
     throw new Error("No image found on clipboard");
   }
 

@@ -477,7 +477,7 @@ export default function BrowseStickers() {
           <Action
             title="Re-analyze with AI"
             icon={Icon.Wand}
-            shortcut={{ modifiers: ["cmd"], key: "a" }}
+            shortcut={{ modifiers: ["cmd", "shift"], key: "a" }}
             onAction={() => handleReanalyze(sticker)}
           />
           {packs.length > 0 && (
